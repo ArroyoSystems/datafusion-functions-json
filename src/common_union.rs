@@ -118,16 +118,17 @@ impl TryFrom<JsonUnion> for UnionArray {
     type Error = arrow::error::ArrowError;
 
     fn try_from(value: JsonUnion) -> Result<Self, Self::Error> {
-        let children: Vec<Arc<dyn Array>> = vec![
-            Arc::new(BooleanArray::from(value.nulls)),
-            Arc::new(BooleanArray::from(value.bools)),
-            Arc::new(Int64Array::from(value.ints)),
-            Arc::new(Float64Array::from(value.floats)),
-            Arc::new(StringArray::from(value.strings)),
-            Arc::new(StringArray::from(value.arrays)),
-            Arc::new(StringArray::from(value.objects)),
+        let [f0, f1, f2, f3, f4, f5, f6] = union_fields_array();
+        let children: Vec<(Field, Arc<dyn Array>)> = vec![
+            (f0, Arc::new(BooleanArray::from(value.nulls))),
+            (f1, Arc::new(BooleanArray::from(value.bools))),
+            (f2, Arc::new(Int64Array::from(value.ints))),
+            (f3, Arc::new(Float64Array::from(value.floats))),
+            (f4, Arc::new(StringArray::from(value.strings))),
+            (f5, Arc::new(StringArray::from(value.arrays))),
+            (f6, Arc::new(StringArray::from(value.objects))),
         ];
-        UnionArray::try_new(union_fields(), Buffer::from_vec(value.type_ids).into(), None, children)
+        UnionArray::try_new(&FIELD_IDS, Buffer::from_slice_ref(&value.type_ids), None, children)
     }
 }
 
@@ -166,6 +167,29 @@ fn union_fields() -> UnionFields {
         })
         .clone()
 }
+
+const FIELD_IDS: [i8; 7] = [
+    TYPE_ID_NULL,
+    TYPE_ID_BOOL,
+    TYPE_ID_INT,
+    TYPE_ID_FLOAT,
+    TYPE_ID_STR,
+    TYPE_ID_ARRAY,
+    TYPE_ID_OBJECT
+];
+
+fn union_fields_array() -> [Field; 7] {
+    [
+        Field::new("null", DataType::Boolean, true),
+        Field::new("bool", DataType::Boolean, false),
+        Field::new("int", DataType::Int64, false),
+        Field::new("float", DataType::Float64, false),
+        Field::new("str", DataType::Utf8, false),
+        Field::new("array", DataType::Utf8, false),
+        Field::new("object", DataType::Utf8, false),
+    ]
+}
+
 
 impl JsonUnionField {
     fn type_id(&self) -> i8 {
